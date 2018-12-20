@@ -1,0 +1,9 @@
+<#@ output extension=".cs" #>
+<#
+	string namespaceName = "com.namespace.of.enum.here";
+    string columnId = "ID_COLUMN_NAME";
+    string columnName = "ENUM_NAME_COLUMN_NAME";
+    string columnDescription = "ENUM_DESCRIPTION_ATTRIBUTE_COLUMN_NAME"; 
+	  string connectionStringName = "ConnectionStringNameOnTheAppConfig"; 
+#> 
+<#@ include file="..\EnumGenerator.ttinclude" #>
