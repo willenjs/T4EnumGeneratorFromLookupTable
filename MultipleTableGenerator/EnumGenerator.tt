@@ -1,0 +1,88 @@
+<#@ template language="C#" debug="false" hostspecific="true"#>
+<#@ output extension=".cs" #>
+<#@ Assembly Name="System.Data" #>
+<#@ assembly name="System.Configuration" #>
+<#@ import namespace="System.Data" #>
+<#@ import namespace="System.Data.SqlClient" #>  
+<#@ import namespace="System.IO" #>
+<#@ import namespace="System.Text.RegularExpressions" #>
+<#@ import namespace="System.Configuration" #>
+<#
+    string namespaceName = "com.namespace.of.enum.here";
+    string columnId = "ID_COLUMN_NAME";
+    string columnName = "ENUM_NAME_COLUMN_NAME";
+    string columnDescription = "ENUM_DESCRIPTION_ATTRIBUTE_COLUMN_NAME"; 
+    string connectionStringName = "ConnectionStringNameOnTheAppConfig"; 
+    
+	  string appConfigPath = @"..\App.config";
+	  string likeExpression = "%Lookup";
+	
+	  var map = new ExeConfigurationFileMap();
+	  map.ExeConfigFilename = this.Host.ResolvePath(appConfigPath);
+    string path = Path.GetDirectoryName(Host.TemplateFile);
+	  var config = ConfigurationManager.OpenMappedExeConfiguration(map, ConfigurationUserLevel.None);
+	  var connectionString = config.ConnectionStrings.ConnectionStrings[connectionStringName].ConnectionString;
+	  connectionString = connectionString.Substring(connectionString.IndexOf("data source=")).Replace("\"", "");
+#>
+using System;
+using System.CodeDom.Compiler;
+
+namespace <#= namespaceName #>
+{
+<#
+    SqlConnection conn = new SqlConnection(connectionString);
+    string command = string.Format("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME LIKE '" + likeExpression + "'");
+    SqlCommand comm = new SqlCommand(command, conn);
+
+    conn.Open();
+
+    SqlDataReader reader = comm.ExecuteReader();
+    bool loop = reader.Read();
+
+    while(loop)
+    {
+    //if the enum name is not like expected, you should check here...
+		string tableName = (string)reader["TABLE_NAME"];
+		string cleanLikeExpression = likeExpression.Replace("%", "");
+		string enumName = tableName.Replace(cleanLikeExpression,"");
+#>
+
+    public enum <#= enumName #>
+    {
+<#
+    SqlConnection conn2 = new SqlConnection(connectionString);
+    string command2 = string.Format("select {0}, {1} from {2} order by {0}", columnId, columnName, tableName);
+    SqlCommand comm2 = new SqlCommand(command2, conn2);
+
+    conn2.Open();
+
+    SqlDataReader reader2 = comm2.ExecuteReader();
+    bool loop2 = reader2.Read();
+
+    while(loop2)
+    {
+#>
+        <#= Pascalize(reader2[columnName]) #> = <#= reader2[columnId] #><# loop2 = reader2.Read(); #><#= loop2 ? ",\r\n" : string.Empty #>
+<#
+    }
+    conn2.Close();
+#>    }
+<#
+		loop = reader.Read();
+	}
+#>
+}
+<#+
+    private string Pascalize(object value)
+    {
+        Regex rx = new Regex(@"(?:[^a-zA-Z0-9]*)(?<first>[a-zA-Z0-9])(?<reminder>[a-zA-Z0-9]*)(?:[^a-zA-Z0-9]*)");
+        return rx.Replace(value.ToString(), m => m.Groups["first"].ToString().ToUpper() + m.Groups["reminder"].ToString().ToLower());
+    }
+
+    private string GetSubNamespace()
+    {
+        Regex rx = new Regex(@"(?:.+Services\s)");
+        string path = Path.GetDirectoryName(Host.TemplateFile);
+        return rx.Replace(path, string.Empty).Replace("\\", ".");
+    }
+#>
